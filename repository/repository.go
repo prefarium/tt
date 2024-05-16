@@ -56,7 +56,7 @@ func (r *Repo) Read(from, to time.Time) ([]entity.Window, error) {
 	}
 	defer file.Close()
 
-	var records []entity.Window
+	var windows []entity.Window
 	reader := csv.NewReader(file)
 	reader.ReuseRecord = true
 
@@ -68,17 +68,17 @@ func (r *Repo) Read(from, to time.Time) ([]entity.Window, error) {
 			return nil, err
 		}
 
-		window, err := deserialize(record)
+		w, err := deserialize(record)
 		if err != nil {
 			return nil, err
 		}
 
-		if window.IsCovered(from, to) {
-			records = append(records, window)
+		if !w.StartsAt.Before(from) && !w.StartsAt.After(to) {
+			windows = append(windows, w)
 		}
 	}
 
-	return records, nil
+	return windows, nil
 }
 
 func deserialize(record []string) (entity.Window, error) {
@@ -88,7 +88,7 @@ func deserialize(record []string) (entity.Window, error) {
 	)
 
 	if w.StartsAt, err = time.Parse(timeFormat, record[0]); err != nil {
-		return entity.Window{}, err
+		return w, err
 	}
 
 	if record[1] == "" {
