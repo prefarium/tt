@@ -20,7 +20,7 @@ func NewRepo(filePath string) *Repo {
 }
 
 func (r *Repo) OpenWindow(t time.Time) error {
-	file, err := os.OpenFile(r.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	file, err := os.OpenFile(r.filePath, os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (r *Repo) Read(from, to time.Time) ([]entity.Window, error) {
 			return nil, err
 		}
 
-		if !w.StartsAt.Before(from) && !w.StartsAt.After(to) {
+		if !w.StartsAt.Before(from) && to.After(w.StartsAt) {
 			windows = append(windows, w)
 		}
 	}
