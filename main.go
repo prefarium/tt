@@ -11,8 +11,17 @@ import (
 )
 
 func main() {
-	now := time.Now()
 	a := app.NewApp("/Users/anton/GolandProjects/tt/tmp", 3)
+
+	if len(os.Args) == 1 {
+		trackTime(a)
+	} else if os.Args[1] == "week" {
+		calculateWeek(a)
+	}
+}
+
+func trackTime(a *app.App) {
+	now := time.Now()
 
 	worked, err := a.WorkedToday()
 	if err != nil {
@@ -42,4 +51,27 @@ func main() {
 			return
 		}
 	}
+}
+
+func calculateWeek(a *app.App) {
+	week, err := a.WorkedThisWeek()
+	if err != nil {
+		fmt.Printf("failed to calculate week: %v\n", err)
+	}
+
+	days := map[int]string{
+		0: "Mon",
+		1: "Tue",
+		2: "Wed",
+		3: "Thu",
+		4: "Fri",
+		5: "Sat",
+		6: "San",
+	}
+
+	for i, d := range week {
+		fmt.Printf("%s %s\n", days[i], d)
+	}
+
+	fmt.Printf("---\nSum %s\n", utils.PrettyDuration(week.Total()))
 }
