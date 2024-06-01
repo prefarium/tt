@@ -1,31 +1,23 @@
 package app
 
 import (
-	"path/filepath"
 	"time"
 	"tt/entity"
 	"tt/repository"
 	"tt/utils"
 )
 
-const fileName = "db.csv"
-
 type App struct {
-	repo   *repository.Repo
-	offset time.Duration
-	tz     *time.Location
+	repo     repository.Repo
+	offset   time.Duration
+	location *time.Location
 }
 
-func NewApp(workingDir string, offset int) *App {
-	tz, err := time.LoadLocation("Europe/Moscow")
-	if err != nil {
-		panic(err)
-	}
-
-	return &App{
-		repository.NewRepo(filepath.Join(workingDir, fileName)),
-		time.Hour * time.Duration(offset),
-		tz,
+func NewApp(workingDir string, offset time.Duration, location *time.Location) App {
+	return App{
+		repository.NewRepo(workingDir),
+		offset,
+		location,
 	}
 }
 
@@ -57,7 +49,7 @@ func (a *App) CloseWindow() error {
 }
 
 func (a *App) WorkedThisWeek() (entity.Week, error) {
-	today := utils.BeginningOfDay(time.Now().In(a.tz))
+	today := utils.BeginningOfDay(time.Now().In(a.location))
 	monday := today.AddDate(0, 0, -dayNumber(today))
 	week := entity.Week{}
 

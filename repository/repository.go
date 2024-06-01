@@ -15,8 +15,8 @@ type Repo struct {
 	filePath string
 }
 
-func NewRepo(filePath string) *Repo {
-	return &Repo{filePath: filePath}
+func NewRepo(filePath string) Repo {
+	return Repo{filePath: filePath}
 }
 
 func (r *Repo) OpenWindow(t time.Time) error {

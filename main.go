@@ -1,17 +1,27 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 	"tt/app"
+	"tt/entity"
 	"tt/utils"
 )
 
 func main() {
-	a := app.NewApp("/Users/anton/GolandProjects/tt/tmp", 3)
+	conf, err := parseConfig()
+	if err != nil {
+		fmt.Printf("parsing config: %s\n", err)
+	}
+
+	a, err := initApp(conf)
+	if err != nil {
+		fmt.Printf("init app: %s\n", err)
+	}
 
 	if len(os.Args) == 1 {
 		trackTime(a)
@@ -20,7 +30,39 @@ func main() {
 	}
 }
 
-func trackTime(a *app.App) {
+func parseConfig() (entity.Config, error) {
+	var c entity.Config
+
+	file, err := os.Open("config.json")
+	if err != nil {
+		return c, err
+	}
+	defer file.Close()
+
+	err = json.NewDecoder(file).Decode(&c)
+	if err != nil {
+		return c, err
+	}
+
+	return c, nil
+}
+
+func initApp(c entity.Config) (app.App, error) {
+	if _, err := os.Stat(c.CsvPath); err != nil {
+		return app.App{}, err
+	}
+
+	offset := time.Minute * time.Duration(c.Offset)
+
+	location, err := time.LoadLocation(c.Location)
+	if err != nil {
+		return app.App{}, err
+	}
+
+	return app.NewApp(c.CsvPath, offset, location), nil
+}
+
+func trackTime(a app.App) {
 	now := time.Now()
 
 	worked, err := a.WorkedToday()
@@ -53,7 +95,7 @@ func trackTime(a *app.App) {
 	}
 }
 
-func calculateWeek(a *app.App) {
+func calculateWeek(a app.App) {
 	week, err := a.WorkedThisWeek()
 	if err != nil {
 		fmt.Printf("failed to calculate week: %v\n", err)
