@@ -2,7 +2,7 @@ package repository
 
 import (
 	"encoding/csv"
-	"fmt"
+	"errors"
 	"io"
 	"os"
 	"time"
@@ -26,27 +26,50 @@ func (r *Repo) OpenWindow(t time.Time) error {
 	}
 	defer file.Close()
 
-	record := fmt.Sprintf("%s,", t.Format(timeFormat))
-	if _, err := file.WriteString(record); err != nil {
+	writer := csv.NewWriter(file)
+	if err = writer.Write(serialize(t, time.Time{})); err != nil {
 		return err
 	}
 
-	return nil
+	writer.Flush()
+	return writer.Error()
 }
 
 func (r *Repo) CloseWindow(t time.Time) error {
-	file, err := os.OpenFile(r.filePath, os.O_WRONLY|os.O_APPEND, 0644)
+	file, err := os.OpenFile(r.filePath, os.O_RDWR, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	record := fmt.Sprintf("%s\n", t.Format(timeFormat))
-	if _, err := file.WriteString(record); err != nil {
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
 		return err
 	}
 
-	return nil
+	lastIdx := len(records) - 1
+	if lastIdx < 0 {
+		return errors.New("no windows found")
+	}
+
+	window, err := deserialize(records[lastIdx])
+	if err != nil {
+		return err
+	} else if window.IsClosed() {
+		return errors.New("window is already closed")
+	}
+
+	records[lastIdx] = serialize(window.StartsAt, t)
+	writer := csv.NewWriter(file)
+	file.Seek(0, io.SeekStart)
+	for _, record := range records {
+		if err = writer.Write(record); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }
 
 func (r *Repo) Read(from, to time.Time) ([]entity.Window, error) {
@@ -79,6 +102,19 @@ func (r *Repo) Read(from, to time.Time) ([]entity.Window, error) {
 	}
 
 	return windows, nil
+}
+
+func serialize(from, to time.Time) []string {
+	var window []string
+	window = append(window, from.Format(timeFormat))
+
+	if to.IsZero() {
+		window = append(window, "")
+	} else {
+		window = append(window, to.Format(timeFormat))
+	}
+
+	return window
 }
 
 func deserialize(record []string) (entity.Window, error) {

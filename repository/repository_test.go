@@ -9,6 +9,141 @@ import (
 	"tt/entity"
 )
 
+func TestRepo_OpenWindow(t *testing.T) {
+	type args struct {
+		t time.Time
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+		content string
+	}{
+		{
+			name: "open window",
+			args: args{p("2024-01-01T12:00:00Z")},
+			want: fmt.Sprint(
+				"2024-01-01T01:00:00Z,2024-01-01T10:00:00Z\n",
+				"2024-01-01T12:00:00Z,\n",
+			),
+			content: "2024-01-01T01:00:00Z,2024-01-01T10:00:00Z\n",
+		},
+		{
+			name: "ignore other opened windows",
+			args: args{p("2024-01-01T12:00:00Z")},
+			want: fmt.Sprint(
+				"2024-01-01T01:00:00Z,\n",
+				"2024-01-01T12:00:00Z,\n",
+			),
+			content: "2024-01-01T01:00:00Z,\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := createTempFile()
+			defer os.Remove(file.Name())
+			file.WriteString(tt.content)
+
+			r := &Repo{filePath: file.Name()}
+			err := r.OpenWindow(tt.args.t)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("OpenWindow() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			got, err := os.ReadFile(file.Name())
+			if err != nil {
+				panic(err)
+			}
+
+			if !reflect.DeepEqual(string(got), tt.want) {
+				t.Errorf("OpenWindow()\ngot  = %#v\nwant = %#v", string(got), tt.want)
+			}
+		})
+	}
+}
+
+func TestRepo_CloseWindow(t *testing.T) {
+	type args struct {
+		t time.Time
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+		content string
+	}{
+		{
+			name: "close window",
+			args: args{p("2024-01-01T15:00:00Z")},
+			want: fmt.Sprint(
+				"2024-01-01T01:00:00Z,2024-01-01T10:00:00Z\n",
+				"2024-01-01T12:00:00Z,2024-01-01T15:00:00Z\n",
+			),
+			content: fmt.Sprint(
+				"2024-01-01T01:00:00Z,2024-01-01T10:00:00Z\n",
+				"2024-01-01T12:00:00Z,\n",
+			),
+		},
+		{
+			name:    "fail if window is already closed",
+			args:    args{p("2024-01-01T15:00:00+03:00")},
+			wantErr: true,
+			content: fmt.Sprint(
+				"2024-01-01T01:00:00+03:00,2024-01-01T10:00:00+03:00\n",
+				"2024-01-01T12:00:00+03:00,2024-01-01T14:00:00+03:00\n",
+			),
+		},
+		{
+			name:    "fail if no windows present",
+			args:    args{p("2024-01-01T15:00:00+03:00")},
+			wantErr: true,
+			content: "",
+		},
+		{
+			name: "ignore other opened window",
+			args: args{p("2024-01-01T15:00:00Z")},
+			want: fmt.Sprint(
+				"2024-01-01T01:00:00Z,\n",
+				"2024-01-01T12:00:00Z,2024-01-01T15:00:00Z\n",
+			),
+			content: fmt.Sprint(
+				"2024-01-01T01:00:00Z,\n",
+				"2024-01-01T12:00:00Z,\n",
+			),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := createTempFile()
+			defer os.Remove(file.Name())
+			file.WriteString(tt.content)
+
+			r := &Repo{filePath: file.Name()}
+			err := r.CloseWindow(tt.args.t)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CloseWindow() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			} else if err != nil {
+				return
+			}
+
+			got, err := os.ReadFile(file.Name())
+			if err != nil {
+				panic(err)
+			}
+
+			if !reflect.DeepEqual(string(got), tt.want) {
+				t.Errorf("CloseWindow()\ngot  = %#v\nwant = %#v", string(got), tt.want)
+			}
+		})
+	}
+}
+
 func TestRepo_Read(t *testing.T) {
 	type args struct {
 		from time.Time
@@ -78,7 +213,7 @@ func TestRepo_Read(t *testing.T) {
 			),
 		},
 		{
-			name: "read not closed window",
+			name: "read not closed windows",
 			args: args{from, to},
 			want: []entity.Window{
 				{p("2024-01-02T01:00:00Z"), time.Time{}},
@@ -109,12 +244,15 @@ func TestRepo_Read(t *testing.T) {
 			file := createTempFile()
 			defer os.Remove(file.Name())
 			file.WriteString(tt.content)
+
 			r := &Repo{filePath: file.Name()}
 			got, err := r.Read(tt.args.from, tt.args.to)
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Read() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Read() got = %v, want %v", got, tt.want)
 			}
