@@ -1,65 +1,43 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 	"tt/app"
-	"tt/entity"
 	"tt/utils"
 )
 
+var (
+	csvPath  string
+	offset   string
+	location string
+)
+
 func main() {
-	conf, err := parseConfig()
-	if err != nil {
-		fmt.Printf("parsing config: %s\n", err)
+	if _, err := os.Stat(csvPath); err != nil {
+		fmt.Printf("checking csv at %s: %s\n", csvPath, err)
 	}
 
-	a, err := initApp(conf)
+	offsetDuration, err := time.ParseDuration(offset)
 	if err != nil {
-		fmt.Printf("init app: %s\n", err)
+		fmt.Printf("parsing offset duration: %s\n", err)
 	}
+
+	parsedLocation, err := time.LoadLocation(location)
+	if err != nil {
+		fmt.Printf("loading location: %s\n", err)
+	}
+
+	a := app.NewApp(csvPath, offsetDuration, parsedLocation)
 
 	if len(os.Args) == 1 {
 		trackTime(a)
 	} else if os.Args[1] == "week" {
 		calculateWeek(a)
 	}
-}
-
-func parseConfig() (entity.Config, error) {
-	var c entity.Config
-
-	file, err := os.Open("config.json")
-	if err != nil {
-		return c, err
-	}
-	defer file.Close()
-
-	err = json.NewDecoder(file).Decode(&c)
-	if err != nil {
-		return c, err
-	}
-
-	return c, nil
-}
-
-func initApp(c entity.Config) (app.App, error) {
-	if _, err := os.Stat(c.CsvPath); err != nil {
-		return app.App{}, err
-	}
-
-	offset := time.Minute * time.Duration(c.Offset)
-
-	location, err := time.LoadLocation(c.Location)
-	if err != nil {
-		return app.App{}, err
-	}
-
-	return app.NewApp(c.CsvPath, offset, location), nil
 }
 
 func trackTime(a app.App) {
