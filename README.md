@@ -1,4 +1,4 @@
-A very simple tool for tracking elapsed work time
+I made a very simple tool for tracking elapsed work time for myself
 
 It requires some configuration before using as follows:
 ```bash
